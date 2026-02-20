@@ -2,22 +2,22 @@
   "version": 2,
   "cleanUrls": true,
   "trailingSlash": false,
-  "routes": [
+  "rewrites": [
     {
-      "src": "/",
-      "dest": "/public/index.html"
+      "source": "/",
+      "destination": "/public/index.html"
     },
     {
-      "src": "/dashboard",
-      "dest": "/public/index.html"
+      "source": "/dashboard",
+      "destination": "/public/index.html"
     },
     {
-      "src": "/index",
-      "dest": "/public/index.html"
+      "source": "/index",
+      "destination": "/public/index.html"
     },
     {
-      "src": "/(.*)",
-      "dest": "/public/$1"
+      "source": "/(.*)",
+      "destination": "/public/$1"
     }
   ]
 }
