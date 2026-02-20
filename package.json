@@ -1,0 +1,17 @@
+{
+  "name": "review-page",
+  "version": "1.0.0",
+  "description": "게임 리뷰 대시보드 및 요약 통계 페이지",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'Static site - no build needed'"
+  },
+  "keywords": [
+    "dashboard",
+    "review",
+    "statistics"
+  ],
+  "author": "",
+  "license": "MIT"
+}

@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>백설공주의 독사과 리뷰 대시보드</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #667eea;
+            --secondary-color: #764ba2;
+            --bg-color: #f4f7f6;
+            --card-bg: #ffffff;
+            --text-color: #333;
+            --text-muted: #666;
+            --border-radius: 12px;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+
+        /* Header */
+        header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 2rem 5%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .refresh-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 0.6rem 1.2rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .refresh-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-1px);
+        }
+
+        .refresh-btn i.rotating {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        /* Main Container */
+        .container {
+            max-width: 1400px;
+            margin: 2rem auto;
+            padding: 0 20px;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            transition: var(--transition);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+        }
+
+        .stat-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+        }
+
+        .stat-info h3 {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-bottom: 0.3rem;
+        }
+
+        .stat-info .value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--text-color);
+        }
+
+        /* Filters */
+        .filters-section {
+            background: var(--card-bg);
+            padding: 1rem 1.5rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+        }
+
+        select {
+            padding: 0.6rem 1rem;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            outline: none;
+            min-width: 200px;
+            background-color: white;
+        }
+
+        /* Charts Section */
+        .charts-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-card {
+            background: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            height: 400px;
+            position: relative;
+        }
+
+        .chart-card h3 {
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+            color: var(--text-color);
+            border-bottom: 1px solid #eee;
+            padding-bottom: 0.8rem;
+        }
+
+        /* Reviews Grid */
+        .reviews-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .reviews-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .review-card {
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            padding: 1.5rem;
+            transition: var(--transition);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .review-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+        }
+
+        .review-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+            padding-bottom: 0.8rem;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .user-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .nickname {
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .role-badge {
+            display: inline-block;
+            padding: 0.25rem 0.6rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            width: fit-content;
+        }
+
+        .role-dwarf { background-color: #e3f2fd; color: #1976d2; }
+        .role-witch { background-color: #f3e5f5; color: #7b1fa2; }
+        .role-prince { background-color: #fff3e0; color: #f57c00; }
+
+        .satisfaction {
+            font-size: 1.2rem;
+        }
+
+        .review-content {
+            flex-grow: 1;
+            color: #444;
+            font-size: 0.95rem;
+            margin-bottom: 1rem;
+            white-space: pre-wrap;
+            line-height: 1.5;
+        }
+
+        .review-footer {
+            font-size: 0.85rem;
+            color: #888;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: auto;
+        }
+
+        .game-title {
+            background: #f5f5f5;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+
+        /* Loading Overlay */
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255,255,255,0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            header {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+            
+            .header-content h1 {
+                font-size: 1.5rem;
+            }
+
+            .filters-section {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            select {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <p>데이터를 불러오는 중입니다...</p>
+    </div>
+
+    <header>
+        <div class="header-content">
+            <h1><i class="fas fa-chart-line"></i> 백설공주의 독사과 리뷰 대시보드</h1>
+        </div>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <a href="summary.html" style="color: white; text-decoration: none; padding: 0.6rem 1.2rem; border-radius: 8px; background: rgba(255, 255, 255, 0.2); transition: all 0.3s ease;" 
+               onmouseover="this.style.background='rgba(255, 255, 255, 0.3)'" 
+               onmouseout="this.style.background='rgba(255, 255, 255, 0.2)'">
+                <i class="fas fa-table"></i> 요약 통계
+            </a>
+            <button class="refresh-btn" onclick="fetchData()">
+                <i class="fas fa-sync-alt" id="refresh-icon"></i> 데이터 동기화
+            </button>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Stats Cards -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon" style="background: #e3f2fd; color: #1976d2;">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="stat-info">
+                    <h3>플레이한 사람 수</h3>
+                    <div class="value" id="total-players">0</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="background: #fff3e0; color: #f57c00;">
+                    <i class="fas fa-star"></i>
+                </div>
+                <div class="stat-info">
+                    <h3>평균 만족도</h3>
+                    <div class="value" id="avg-satisfaction">0.0</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="background: #e8f5e9; color: #388e3c;">
+                    <i class="fas fa-gamepad"></i>
+                </div>
+                <div class="stat-info">
+                    <h3>진행된 게임 수</h3>
+                    <div class="value" id="total-games">0</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="background: #f3e5f5; color: #7b1fa2;">
+                    <i class="fas fa-comment-dots"></i>
+                </div>
+                <div class="stat-info">
+                    <h3>총 리뷰 수</h3>
+                    <div class="value" id="total-reviews">0</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="background: #ffebee; color: #c62828;">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="stat-info">
+                    <h3>최근 리뷰</h3>
+                    <div class="value" style="font-size: 1rem;" id="last-update">-</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="filters-section">
+            <div class="filter-group">
+                <i class="fas fa-filter" style="color: var(--primary-color);"></i>
+                <strong>필터:</strong>
+            </div>
+            <div class="filter-group" style="flex-grow: 1;">
+                <select id="game-filter" onchange="applyFilters()">
+                    <option value="all">모든 게임 보기</option>
+                    <!-- Options will be populated dynamically -->
+                </select>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="charts-section">
+            <div class="chart-card">
+                <h3><i class="fas fa-smile"></i> 만족도 분포</h3>
+                <canvas id="satisfactionChart"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3><i class="fas fa-user-clock"></i> 플레이 경험 분포</h3>
+                <canvas id="experienceChart"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3><i class="fas fa-sign-in-alt"></i> 유입 경로 분포</h3>
+                <canvas id="inflowChart"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3><i class="fas fa-user-friends"></i> 추천 대상 분포</h3>
+                <canvas id="recommendationChart"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3><i class="fas fa-heart"></i> 후속작 관심도 분포</h3>
+                <canvas id="sequelChart"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3><i class="fas fa-flag-checkered"></i> 엔딩 데이터 분포</h3>
+                <canvas id="endingChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Reviews Grid -->
+        <div class="reviews-header">
+            <h2><i class="fas fa-list-alt"></i> 최신 리뷰 목록</h2>
+            <span style="color: var(--text-muted); font-size: 0.9rem;" id="review-count-display"></span>
+        </div>
+        <div class="reviews-grid" id="reviews-container">
+            <!-- Review cards will be inserted here -->
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_URL = 'https://script.google.com/macros/s/AKfycbwyQry92GEJjb2uk4ZCWaeprnVm7Gk5RnJiAd0S8dYhCJsBwxDSjACrCU8yIixmkzm3/exec';
+
+        // State
+        let rawData = [];
+        let charts = {};
+
+        // Icons map for satisfaction
+        const satisfactionIcons = {
+            '🥰 최고에요': '🥰',
+            '🙂 좋아요': '🙂',
+            '😐 보통이에요': '😐',
+            '🥲 아쉬워요': '🥲'
+        };
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchData();
+        });
+
+        async function fetchData() {
+            const refreshIcon = document.getElementById('refresh-icon');
+            const loadingOverlay = document.getElementById('loading-overlay');
+            
+            refreshIcon.classList.add('rotating');
+            loadingOverlay.style.display = 'flex';
+
+            try {
+                const response = await fetch(API_URL);
+                const json = await response.json();
+                
+                processData(json);
+                
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                alert('데이터를 불러오는데 실패했습니다. 콘솔을 확인해주세요.');
+            } finally {
+                refreshIcon.classList.remove('rotating');
+                loadingOverlay.style.display = 'none';
+            }
+        }
+
+        function processData(jsonData) {
+            rawData = jsonData.map(item => {
+                // Server now handles cleaning and deduplication
+                // Use CleanGameTitle for grouping/filtering
+                // Use OriginalGameTitle for display
+                return {
+                    sentTime: item.sentTime,
+                    gameId: item.GameId || '',
+                    gameTitle: item.CleanGameTitle || (item.GameTitle || '').replace(/\s+\d+$/, '').trim(),
+                    originalTitle: item.OriginalGameTitle || item.GameTitle || '',
+                    nickname: item.Nickname || '익명', // Public 시트에 닉네임이 없을 경우 대비
+                    role: item.Role || '',
+                    team: item.Team || '',
+                    satisfaction: item['만족도'] || '',
+                    experience: item['플레이 경험'] || '',
+                    inflow: item['유입 경로'] || '',
+                    recommendation: item['추천 대상'] || '',
+                    sequelInterest: item['후속작 관심도'] || '',
+                    endingData: item['Ending Data'] || '',
+                    comment: item['추가 의견'] || '',
+                    dateObj: new Date(item.sentTime)
+                };
+            }).filter(item => item.gameTitle); // Filter out empty rows
+
+            // Sort by date descending
+            rawData.sort((a, b) => b.dateObj - a.dateObj);
+
+            // Debug: 백설공주 + 아쉬워요 데이터 확인
+            const 백설공주아쉬워요 = rawData.filter(item => 
+                item.gameTitle.includes('백설공주') && 
+                item.satisfaction && 
+                item.satisfaction.includes('아쉬')
+            );
+            console.log('백설공주 + 아쉬워요 데이터:', 백설공주아쉬워요.length, '개');
+            if (백설공주아쉬워요.length > 0) {
+                console.log('백설공주 아쉬워요 샘플:', 백설공주아쉬워요.slice(0, 5).map(item => ({
+                    gameTitle: item.gameTitle,
+                    originalTitle: item.originalTitle,
+                    satisfaction: item.satisfaction,
+                    gameId: item.gameId
+                })));
+            }
+
+            populateFilter();
+            
+            // Check URL parameter for game filter
+            const urlParams = new URLSearchParams(window.location.search);
+            const gameParam = urlParams.get('game');
+            if (gameParam) {
+                const decodedGame = decodeURIComponent(gameParam);
+                const filterSelect = document.getElementById('game-filter');
+                // Wait a bit for filter options to be populated
+                setTimeout(() => {
+                    if ([...filterSelect.options].some(opt => opt.value === decodedGame)) {
+                        filterSelect.value = decodedGame;
+                        renderDashboard();
+                    }
+                }, 100);
+            } else {
+                renderDashboard();
+            }
+        }
+
+        function populateFilter() {
+            const filterSelect = document.getElementById('game-filter');
+            const uniqueGames = [...new Set(rawData.map(item => item.gameTitle))].sort();
+            
+            // Save current selection
+            const currentSelection = filterSelect.value;
+            
+            filterSelect.innerHTML = '<option value="all">모든 게임 보기</option>';
+            uniqueGames.forEach(game => {
+                const option = document.createElement('option');
+                option.value = game;
+                option.textContent = game;
+                filterSelect.appendChild(option);
+            });
+
+            // Restore selection if valid
+            if (uniqueGames.includes(currentSelection)) {
+                filterSelect.value = currentSelection;
+            }
+        }
+
+        function applyFilters() {
+            renderDashboard();
+        }
+
+        function renderDashboard() {
+            const selectedGame = document.getElementById('game-filter').value;
+            const filteredData = selectedGame === 'all' 
+                ? rawData 
+                : rawData.filter(item => item.gameTitle === selectedGame);
+
+            // Debug: 필터링된 데이터 확인
+            if (selectedGame !== 'all') {
+                const 아쉬워요데이터 = filteredData.filter(item => item.satisfaction && item.satisfaction.includes('아쉬'));
+                console.log(`필터: ${selectedGame}, 아쉬워요 데이터:`, 아쉬워요데이터.length, '개');
+                console.log('아쉬워요 샘플:', 아쉬워요데이터.slice(0, 3));
+                console.log('필터링된 전체 만족도:', filteredData.filter(item => item.satisfaction).map(item => ({
+                    gameTitle: item.gameTitle,
+                    satisfaction: item.satisfaction,
+                    originalTitle: item.originalTitle
+                })).slice(0, 10));
+            }
+
+            updateStats(filteredData);
+            renderCharts(filteredData);
+            
+            // Filter out reviews with empty, whitespace-only, or single-character comments
+            const reviewsWithContent = filteredData.filter(item => {
+                const comment = item.comment || '';
+                return comment.trim().length > 1;
+            });
+            renderReviews(reviewsWithContent);
+        }
+
+        function updateStats(data) {
+            // 플레이한 사람 수 (전체 데이터 수)
+            document.getElementById('total-players').textContent = data.length;
+
+            // 총 리뷰 수 (만족도에 응답한 사람 수)
+            const reviewCount = data.filter(item => item.satisfaction && item.satisfaction.trim() !== '').length;
+            document.getElementById('total-reviews').textContent = reviewCount;
+
+            // Average Satisfaction (🥰 최고에요: 5점, 🙂 괜찮아요: 3점, 🥲 아쉬워요: 1점)
+            let totalScore = 0;
+            let count = 0;
+            data.forEach(item => {
+                if (item.satisfaction && item.satisfaction.trim() !== '') {
+                    if (item.satisfaction.includes('최고')) totalScore += 5;
+                    else if (item.satisfaction.includes('괜찮아요')) totalScore += 3;
+                    else if (item.satisfaction.includes('아쉬')) totalScore += 1;
+                    // 다른 만족도는 점수에 포함하지 않음
+                    count++;
+                }
+            });
+            const avg = count > 0 ? (totalScore / count).toFixed(1) : '0.0';
+            document.getElementById('avg-satisfaction').textContent = avg;
+
+            // 진행된 게임 수 (고유한 GameId 개수)
+            const uniqueGameIds = new Set(data.map(item => item.gameId).filter(id => id && id.trim() !== ''));
+            document.getElementById('total-games').textContent = uniqueGameIds.size;
+
+            // Last Update
+            if (data.length > 0) {
+                const lastDate = data[0].dateObj;
+                const timeAgo = Math.floor((new Date() - lastDate) / (1000 * 60 * 60 * 24));
+                document.getElementById('last-update').textContent = `${timeAgo}일 전`;
+            } else {
+                document.getElementById('last-update').textContent = '-';
+            }
+        }
+
+        function renderCharts(data) {
+            // 1. Satisfaction Chart
+            const satCounts = {};
+            data.forEach(item => {
+                if(item.satisfaction && item.satisfaction.trim() !== '') {
+                    const satValue = item.satisfaction.trim();
+                    satCounts[satValue] = (satCounts[satValue] || 0) + 1;
+                }
+            });
+
+            // Debug: 만족도 데이터 확인
+            console.log('만족도 데이터:', satCounts);
+            console.log('전체 데이터 샘플:', data.filter(item => item.satisfaction).slice(0, 5));
+
+            const satCtx = document.getElementById('satisfactionChart').getContext('2d');
+            if (charts.satisfaction) charts.satisfaction.destroy();
+            
+            // Color mapping for satisfaction
+            const satisfactionColors = {};
+            const satLabels = Object.keys(satCounts);
+            satLabels.forEach(label => {
+                if (label.includes('최고')) satisfactionColors[label] = '#36A2EB'; // 파랑
+                else if (label.includes('괜찮아요') || label.includes('좋아요')) satisfactionColors[label] = '#4BC0C0'; // 초록 (청록색)
+                else if (label.includes('아쉬')) satisfactionColors[label] = '#FF9800'; // 주황
+                else satisfactionColors[label] = '#FFCE56'; // 기본 노랑
+            });
+            
+            charts.satisfaction = new Chart(satCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: satLabels,
+                    datasets: [{
+                        data: Object.values(satCounts),
+                        backgroundColor: satLabels.map(label => satisfactionColors[label] || '#999999')
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+
+            // 2. Experience Chart
+            const expCounts = {};
+            data.forEach(item => {
+                if(item.experience) {
+                    // Normalize '6~15회' and '6회~15회' to '6~15회'
+                    let normalizedExp = item.experience.replace(/^6회~15회$/, '6~15회');
+                    expCounts[normalizedExp] = (expCounts[normalizedExp] || 0) + 1;
+                }
+            });
+
+            const expCtx = document.getElementById('experienceChart').getContext('2d');
+            if (charts.experience) charts.experience.destroy();
+
+            // Sort labels in specified order
+            const expOrder = ['이번이 처음이에요', '2~5회', '6~15회', '26회 이상'];
+            const sortedExpLabels = expOrder.filter(label => expCounts.hasOwnProperty(label))
+                .concat(Object.keys(expCounts).filter(label => !expOrder.includes(label)).sort((a, b) => a.localeCompare(b, 'ko')));
+            const sortedExpData = sortedExpLabels.map(label => expCounts[label]);
+
+            charts.experience = new Chart(expCtx, {
+                type: 'bar',
+                data: {
+                    labels: sortedExpLabels,
+                    datasets: [{
+                        label: '플레이어 수',
+                        data: sortedExpData,
+                        backgroundColor: 'rgba(102, 126, 234, 0.7)',
+                        borderColor: 'rgba(102, 126, 234, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+
+            // 3. 유입 경로 Chart
+            const inflowCounts = {};
+            data.forEach(item => {
+                if(item.inflow) {
+                    inflowCounts[item.inflow] = (inflowCounts[item.inflow] || 0) + 1;
+                }
+            });
+
+            const inflowCtx = document.getElementById('inflowChart').getContext('2d');
+            if (charts.inflow) charts.inflow.destroy();
+
+            charts.inflow = new Chart(inflowCtx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(inflowCounts),
+                    datasets: [{
+                        label: '응답 수',
+                        data: Object.values(inflowCounts),
+                        backgroundColor: 'rgba(75, 192, 192, 0.7)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+
+            // 4. 추천 대상 Chart
+            const recCounts = {};
+            data.forEach(item => {
+                if(item.recommendation) {
+                    recCounts[item.recommendation] = (recCounts[item.recommendation] || 0) + 1;
+                }
+            });
+
+            const recCtx = document.getElementById('recommendationChart').getContext('2d');
+            if (charts.recommendation) charts.recommendation.destroy();
+
+            // Sort labels alphabetically
+            const sortedRecLabels = Object.keys(recCounts).sort((a, b) => a.localeCompare(b, 'ko'));
+            const sortedRecData = sortedRecLabels.map(label => recCounts[label]);
+
+            charts.recommendation = new Chart(recCtx, {
+                type: 'bar',
+                data: {
+                    labels: sortedRecLabels,
+                    datasets: [{
+                        label: '응답 수',
+                        data: sortedRecData,
+                        backgroundColor: 'rgba(255, 159, 64, 0.7)',
+                        borderColor: 'rgba(255, 159, 64, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+
+            // 5. 후속작 관심도 Chart
+            const sequelCounts = {};
+            data.forEach(item => {
+                if(item.sequelInterest) {
+                    sequelCounts[item.sequelInterest] = (sequelCounts[item.sequelInterest] || 0) + 1;
+                }
+            });
+
+            const sequelCtx = document.getElementById('sequelChart').getContext('2d');
+            if (charts.sequel) charts.sequel.destroy();
+
+            // Sort labels alphabetically
+            const sortedSequelLabels = Object.keys(sequelCounts).sort((a, b) => a.localeCompare(b, 'ko'));
+            const sortedSequelData = sortedSequelLabels.map(label => sequelCounts[label]);
+
+            charts.sequel = new Chart(sequelCtx, {
+                type: 'bar',
+                data: {
+                    labels: sortedSequelLabels,
+                    datasets: [{
+                        label: '응답 수',
+                        data: sortedSequelData,
+                        backgroundColor: 'rgba(153, 102, 255, 0.7)',
+                        borderColor: 'rgba(153, 102, 255, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+
+            // 6. Ending Data Chart (게임 기준)
+            // GameId별로 그룹화하여 각 게임의 엔딩 데이터를 카운트
+            const gameEndings = {};
+            data.forEach(item => {
+                if(item.gameId && item.endingData && item.endingData.trim() !== '') {
+                    if(!gameEndings[item.gameId]) {
+                        gameEndings[item.gameId] = {};
+                    }
+                    const ending = item.endingData.trim();
+                    gameEndings[item.gameId][ending] = (gameEndings[item.gameId][ending] || 0) + 1;
+                }
+            });
+
+            // 각 게임에서 가장 많이 선택된 엔딩을 해당 게임의 엔딩으로 결정
+            const endingCounts = {};
+            Object.keys(gameEndings).forEach(gameId => {
+                const endings = gameEndings[gameId];
+                let maxCount = 0;
+                let mostCommonEnding = '';
+                Object.keys(endings).forEach(ending => {
+                    if(endings[ending] > maxCount) {
+                        maxCount = endings[ending];
+                        mostCommonEnding = ending;
+                    }
+                });
+                if(mostCommonEnding) {
+                    endingCounts[mostCommonEnding] = (endingCounts[mostCommonEnding] || 0) + 1;
+                }
+            });
+
+            const endingCtx = document.getElementById('endingChart').getContext('2d');
+            if (charts.ending) charts.ending.destroy();
+
+            charts.ending = new Chart(endingCtx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(endingCounts),
+                    datasets: [{
+                        label: '게임 수',
+                        data: Object.values(endingCounts),
+                        backgroundColor: 'rgba(255, 99, 132, 0.7)',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+
+        function renderReviews(data) {
+            const container = document.getElementById('reviews-container');
+            container.innerHTML = '';
+            document.getElementById('review-count-display').textContent = `총 ${data.length}개의 리뷰`;
+
+            data.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'review-card';
+                
+                // Role Badge Style
+                let roleClass = '';
+                if (item.role === '난쟁이') roleClass = 'role-dwarf';
+                else if (item.role === '노파') roleClass = 'role-witch';
+                else if (item.role === '왕자') roleClass = 'role-prince';
+
+                // Format Date
+                const dateStr = item.dateObj.toLocaleDateString('ko-KR', { 
+                    year: '2-digit', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                });
+
+                // Convert %%% to line breaks
+                const formattedComment = item.comment 
+                    ? item.comment.replace(/%%%/g, '<br>')
+                    : '';
+
+                card.innerHTML = `
+                    <div class="review-header">
+                        <div class="user-info">
+                            <span class="nickname">${item.nickname || '익명'}</span>
+                            <span class="role-badge ${roleClass}">${item.role || '알 수 없음'}</span>
+                        </div>
+                        <div class="satisfaction" title="${item.satisfaction}">
+                            ${getSatisfactionEmoji(item.satisfaction)}
+                        </div>
+                    </div>
+                    <div class="review-content">${formattedComment}</div>
+                    <div class="review-footer">
+                        <span class="game-title">${item.originalTitle}</span>
+                        <span>${dateStr}</span>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function getSatisfactionEmoji(text) {
+            if (!text) return '❓';
+            if (text.includes('최고')) return '🥰';
+            if (text.includes('좋아요')) return '🙂';
+            if (text.includes('보통')) return '😐';
+            if (text.includes('아쉬')) return '🥲';
+            return '🤔';
+        }
+    </script>
+</body>
+</html>
