@@ -6,6 +6,7 @@
     <title>게임 리뷰 통계 시스템</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <script src="data/games.js"></script> <!-- 게임 설정 데이터 로드 -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
@@ -170,9 +171,10 @@
             color: var(--text-sub);
             border-bottom: 1px solid var(--border);
         }
-        th:first-child { text-align: left; }
+        th:first-child { text-align: center; width: 50px; }
+        th:nth-child(2) { text-align: left; }
         td { padding: 0.6rem 1rem; vertical-align: middle; border-bottom: 1px solid var(--border-light); font-size: 0.95rem; text-align: center; }
-        td:first-child { font-weight: 600; cursor: pointer; color: var(--primary); text-align: left; }
+        td:nth-child(2) { font-weight: 600; cursor: pointer; color: var(--primary); text-align: left; }
         .stat-number { font-weight: 600; color: var(--text-main); }
         .mini-chart-container { width: 120px; height: 100px; }
 
@@ -212,7 +214,7 @@
             flex-direction: column;
         }
         .chart-group h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 1.5rem; }
-        .chart-container { height: 300px; position: relative; }
+        .chart-container { height: 220px; position: relative; display: flex; align-items: center; justify-content: center; }
 
         .reviews-section { margin-top: 4rem; }
         .reviews-grid { display: grid; grid-template-columns: 1fr; gap: 0; border-top: 1px solid var(--border); }
@@ -265,12 +267,25 @@
             main { margin-left: 0; width: 100%; }
             .mobile-menu-btn { display: block; }
             .stats-grid { grid-template-columns: repeat(2, 1fr); }
-            .charts-section { grid-template-columns: 1fr; }
-            .review-row { grid-template-columns: 1fr; gap: 1rem; }
+            .charts-section { grid-template-columns: repeat(2, 1fr); gap: 1rem; width: 100%; }
+            .chart-group { width: 100%; min-width: 0; }
+            .chart-container { height: 160px; width: 100%; }
         }
         @media (max-width: 768px) {
-            .container { padding: 2rem 1.5rem; }
-            .stat-item .value { font-size: 1.8rem; }
+            .container { padding: 2rem 1rem; }
+            .stat-item .value { font-size: 1.6rem; }
+            .charts-section { gap: 0.8rem; }
+            .chart-group h3 { font-size: 0.85rem; margin-bottom: 0.8rem; }
+            .chart-container { height: 140px; }
+            
+            /* Review Text Scaling for Mobile */
+            .review-row { padding: 1.5rem 0; display: block; }
+            .review-meta { margin-bottom: 0.5rem; }
+            .nickname { font-size: 0.9rem; }
+            .role-badge { font-size: 0.75rem; }
+            .review-content { font-size: 0.9rem; line-height: 1.5; }
+            .review-date { font-size: 0.8rem; }
+            #main-title { font-size: 1.5rem; margin-bottom: 1.5rem; }
         }
     </style>
 </head>
@@ -317,7 +332,9 @@
                     <table>
                         <thead>
                             <tr>
+                                <th>No.</th>
                                 <th>게임 제목</th>
+                                <th>인원수</th>
                                 <th>진행</th>
                                 <th>플레이어</th>
                                 <th>리뷰</th>
@@ -348,6 +365,7 @@
                     <div class="chart-group"><h3>후속작 관심도</h3><div class="chart-container"><canvas id="sequelChart"></canvas></div></div>
                     <div class="chart-group"><h3>추천 대상</h3><div class="chart-container"><canvas id="recommendationChart"></canvas></div></div>
                     <div class="chart-group"><h3>플레이 경험</h3><div class="chart-container"><canvas id="experienceChart"></canvas></div></div>
+                    <div class="chart-group"><h3>엔딩 데이터</h3><div class="chart-container"><canvas id="endingChart"></canvas></div></div>
                     <div class="chart-group"><h3>유입 경로</h3><div class="chart-container"><canvas id="inflowChart"></canvas></div></div>
                 </div>
 
@@ -362,16 +380,18 @@
     <script>
         const API_URL = 'https://script.google.com/macros/s/AKfycbwyQry92GEJjb2uk4ZCWaeprnVm7Gk5RnJiAd0S8dYhCJsBwxDSjACrCU8yIixmkzm3/exec';
         let rawData = [];
+        let gameSettings = window.GAME_SETTINGS || []; // games.js에서 로드된 데이터 사용
         let charts = {};
         let selectedGame = 'all';
         
         // Apple-ish Monotone + Mid-saturation Colors
         const colors = ['#1d1d1f', '#86868b', '#d2d2d7', '#e8e8ed', '#f5f5f7'];
-        const pointColors = ['#0071e3', '#ff9f0a', '#34c759', '#af52de', '#ff3b30'];
+        const pointColors = ['#5e9ed9', '#f0a35e', '#6dbf7a', '#a385d9', '#e67373'];
 
         Chart.register(ChartDataLabels);
 
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
+            // loadGameSettings() 제거 - 스크립트 태그로 로드됨
             const cachedData = localStorage.getItem('review_data_cache');
             if (cachedData) {
                 try {
@@ -386,6 +406,35 @@
             }
             fetchData();
         });
+
+        // async function loadGameSettings() 제거
+
+        function titlesMatch(dataTitle, configTitle) {
+            if (!dataTitle || !configTitle) return false;
+            const a = dataTitle.replace(/\s+/g, '');
+            const b = configTitle.replace(/\s+/g, '');
+            return a === b || a.includes(b) || b.includes(a);
+        }
+
+        function getGameInfo(title) {
+            if (!title) return { order: 999, players: '' };
+            const setting = gameSettings.find(g => titlesMatch(title, g.title));
+            return setting || { order: 999, players: '' };
+        }
+
+        /** games.json 순서대로 정렬된 게임 제목 목록 반환 */
+        function getOrderedGameTitles() {
+            const gamesInData = [...new Set(rawData.map(item => item.gameTitle))];
+            const ordered = [];
+            gameSettings.forEach(g => {
+                const match = gamesInData.find(t => titlesMatch(t, g.title));
+                if (match && !ordered.includes(match)) ordered.push(match);
+            });
+            gamesInData.forEach(t => {
+                if (!ordered.includes(t)) ordered.push(t);
+            });
+            return ordered;
+        }
 
         async function fetchData(isBackground = false, retryCount = 0) {
             const refreshIcon = document.getElementById('refresh-icon');
@@ -456,7 +505,10 @@
                     comment: item['추가 의견'] || '',
                     dateObj: new Date(item.sentTime)
                 })).filter(item => item.gameTitle);
-                rawData.sort((a, b) => b.dateObj - a.dateObj);
+                
+                // 기본 정렬을 날짜순이 아닌 games.json 순서로 변경 (요약 페이지용)
+                // rawData.sort((a, b) => b.dateObj - a.dateObj); 
+                
                 populateSidebar();
                 // #region agent log
                 fetch('http://127.0.0.1:7243/ingest/cedb580a-3ce2-4a76-aff9-90441ec1495a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hypothesisId:'5',location:'index.html:processData',message:'Finished processData',data:{rawDataCount:rawData.length},timestamp:Date.now()})}).catch(()=>{});
@@ -494,15 +546,16 @@
 
         function populateSidebar() {
             const menu = document.getElementById('game-menu');
-            const uniqueGames = [...new Set(rawData.map(item => item.gameTitle))].sort();
+            const orderedGames = getOrderedGameTitles();
             const allGamesItem = menu.querySelector('[data-game="all"]');
             menu.innerHTML = '';
             menu.appendChild(allGamesItem);
             
-            uniqueGames.forEach(game => {
+            orderedGames.forEach(game => {
+                const info = getGameInfo(game);
                 const item = document.createElement('div');
                 item.className = 'game-item';
-                item.textContent = game;
+                item.textContent = info.players ? `${game} (${info.players})` : game;
                 item.onclick = () => selectGame(game);
                 item.setAttribute('data-game', game);
                 menu.appendChild(item);
@@ -558,8 +611,9 @@
                 gameGroups[item.gameTitle].push(item);
             });
 
-            Object.keys(gameGroups).sort((a, b) => a.localeCompare(b, 'ko')).forEach((gameTitle, index) => {
+            getOrderedGameTitles().filter(t => gameGroups[t]).forEach((gameTitle, index) => {
                 const gameData = gameGroups[gameTitle];
+                const info = getGameInfo(gameTitle);
                 const uniqueGameIds = new Set(gameData.map(item => item.gameId).filter(id => id && id.trim()));
                 const reviews = gameData.filter(item => item.satisfaction && item.satisfaction.trim());
                 
@@ -591,7 +645,9 @@
                 const satId = `sat-chart-${index}`, sequelId = `sequel-chart-${index}`, recId = `rec-chart-${index}`;
                 const row = document.createElement('tr');
                 row.innerHTML = `
+                    <td><span class="stat-number">${info.order !== 999 ? info.order : '-'}</span></td>
                     <td onclick="selectGame('${gameTitle}')">${gameTitle}</td>
+                    <td><span class="stat-number">${info.players || '-'}</span></td>
                     <td><span class="stat-number">${uniqueGameIds.size}</span></td>
                     <td><span class="stat-number">${gameData.length}</span></td>
                     <td><span class="stat-number">${reviews.length}</span></td>
@@ -813,10 +869,20 @@
                         type: isDoughnut ? 'doughnut' : 'bar',
                         data: { labels: labels, datasets: datasets },
                         options: { 
-                            responsive: true, maintainAspectRatio: false, layout: { padding: { top: 10, bottom: 10, left: 0, right: 0 } },
-                            cutout: isDoughnut ? '80%' : 0, 
+                            responsive: true, maintainAspectRatio: false, 
+                            layout: { padding: isDoughnut ? { top: 0, bottom: 0, left: 0, right: 0 } : { top: 10, bottom: 10, left: 0, right: 0 } },
+                            cutout: isDoughnut ? '70%' : 0, 
                         plugins: { 
-                            legend: { position: 'bottom', display: isDoughnut, labels: { boxWidth: 8, padding: 20, font: { size: 11, weight: '500' }, usePointStyle: true } },
+                            legend: { 
+                                position: 'bottom', 
+                                display: isDoughnut, 
+                                labels: { 
+                                    boxWidth: 8, 
+                                    padding: 10, 
+                                    font: { size: 11, weight: '500' }, 
+                                    usePointStyle: true 
+                                } 
+                            },
                             tooltip: { 
                                 backgroundColor: 'rgba(0,0,0,0.8)', 
                                 padding: 12, 
@@ -838,16 +904,18 @@
                                 }, 
                                 grid: { color: '#f5f5f7' } 
                             }, 
-                            x: { 
-                                ticks: { 
-                                    font: { size: 10 }, 
-                                    color: '#86868b' 
-                                }, 
-                                grid: { display: false } 
+                                x: { 
+                                    ticks: { 
+                                        font: { size: 9 }, 
+                                        color: '#86868b',
+                                        maxRotation: 45,
+                                        minRotation: 0
+                                    }, 
+                                    grid: { display: false } 
+                                } 
                             } 
                         } 
-                    }
-                });
+                    });
                     // #region agent log
                     fetch('http://127.0.0.1:7243/ingest/cedb580a-3ce2-4a76-aff9-90441ec1495a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hypothesisId:'4',location:'index.html:createChart',message:'Chart created',data:{id,labels,values},timestamp:Date.now()})}).catch(()=>{});
                     // #endregion
@@ -859,7 +927,7 @@
             };
             createChart('satisfactionChart', 'satisfaction');
             createChart('experienceChart', 'experience');
-            createChart('endingChart', 'endingData');
+            createChart('endingChart', 'endingData', true);
             createChart('inflowChart', 'inflow', true);
             createChart('recommendationChart', 'recommendation');
             createChart('sequelChart', 'sequelInterest');
@@ -869,7 +937,11 @@
             const container = document.getElementById('reviews-container');
             container.innerHTML = '';
             document.getElementById('review-count-display').textContent = `${data.length} Reviews`;
-            data.forEach(item => {
+            
+            // 리뷰는 항상 최신순으로 정렬
+            const sortedData = [...data].sort((a, b) => b.dateObj - a.dateObj);
+            
+            sortedData.forEach(item => {
                 const row = document.createElement('div');
                 row.className = 'review-row';
                 
