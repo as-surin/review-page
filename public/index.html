@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>게임 리뷰 통계 시스템</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
@@ -156,21 +157,24 @@
         /* Summary View - Table Focus */
         .summary-card {
             border-top: 1px solid var(--border);
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
         }
 
-        table { width: 100%; border-collapse: collapse; }
+        table { width: 100%; border-collapse: collapse; min-width: 800px; }
         th {
             padding: 1rem;
-            text-align: left;
+            text-align: center;
             font-weight: 600;
             font-size: 0.8rem;
             color: var(--text-sub);
             border-bottom: 1px solid var(--border);
         }
-        td { padding: 1.2rem 1rem; vertical-align: middle; border-bottom: 1px solid var(--border-light); font-size: 0.95rem; }
-        td:first-child { font-weight: 600; cursor: pointer; color: var(--primary); }
+        th:first-child { text-align: left; }
+        td { padding: 0.6rem 1rem; vertical-align: middle; border-bottom: 1px solid var(--border-light); font-size: 0.95rem; text-align: center; }
+        td:first-child { font-weight: 600; cursor: pointer; color: var(--primary); text-align: left; }
         .stat-number { font-weight: 600; color: var(--text-main); }
-        .mini-chart-container { width: 120px; height: 60px; }
+        .mini-chart-container { width: 120px; height: 100px; }
 
         /* Dashboard View - Section Focus */
         .section-label {
@@ -319,6 +323,7 @@
                                 <th>리뷰</th>
                                 <th>만족도</th>
                                 <th>만족도 분포</th>
+                                <th>후속작 관심도</th>
                                 <th>추천 대상</th>
                             </tr>
                         </thead>
@@ -340,8 +345,8 @@
                 <div class="section-label">Distributions</div>
                 <div class="charts-section">
                     <div class="chart-group"><h3>만족도 분포</h3><div class="chart-container"><canvas id="satisfactionChart"></canvas></div></div>
-                    <div class="chart-group"><h3>추천 대상</h3><div class="chart-container"><canvas id="recommendationChart"></canvas></div></div>
                     <div class="chart-group"><h3>후속작 관심도</h3><div class="chart-container"><canvas id="sequelChart"></canvas></div></div>
+                    <div class="chart-group"><h3>추천 대상</h3><div class="chart-container"><canvas id="recommendationChart"></canvas></div></div>
                     <div class="chart-group"><h3>플레이 경험</h3><div class="chart-container"><canvas id="experienceChart"></canvas></div></div>
                     <div class="chart-group"><h3>유입 경로</h3><div class="chart-container"><canvas id="inflowChart"></canvas></div></div>
                 </div>
@@ -363,6 +368,8 @@
         // Apple-ish Monotone + Mid-saturation Colors
         const colors = ['#1d1d1f', '#86868b', '#d2d2d7', '#e8e8ed', '#f5f5f7'];
         const pointColors = ['#0071e3', '#ff9f0a', '#34c759', '#af52de', '#ff3b30'];
+
+        Chart.register(ChartDataLabels);
 
         document.addEventListener('DOMContentLoaded', () => {
             const cachedData = localStorage.getItem('review_data_cache');
@@ -557,30 +564,136 @@
                 const reviews = gameData.filter(item => item.satisfaction && item.satisfaction.trim());
                 
                 let score = 0;
-                const satCounts = {}, recCounts = {};
+                const satCounts = {}, recCounts = {}, sequelCounts = {};
                 reviews.forEach(item => {
-                    const sat = item.satisfaction.trim();
-                    satCounts[sat] = (satCounts[sat] || 0) + 1;
-                    if (sat.includes('최고')) score += 5;
-                    else if (sat.includes('괜찮아요')) score += 3;
-                    else if (sat.includes('아쉬')) score += 1;
+                    const sat = (item.satisfaction || '').trim();
+                    if (sat) {
+                        // Normalize satisfaction labels to ensure matching
+                        let normalizedSat = sat;
+                        if (sat.includes('최고')) normalizedSat = '🥰 최고에요';
+                        else if (sat.includes('괜찮')) normalizedSat = '🙂 괜찮아요';
+                        else if (sat.includes('아쉬')) normalizedSat = '🥲 아쉬워요';
+                        
+                        satCounts[normalizedSat] = (satCounts[normalizedSat] || 0) + 1;
+                        
+                        if (sat.includes('최고')) score += 5;
+                        else if (sat.includes('괜찮')) score += 3;
+                        else if (sat.includes('아쉬')) score += 1;
+                    }
                 });
-                gameData.forEach(item => { if(item.recommendation) recCounts[item.recommendation] = (recCounts[item.recommendation] || 0) + 1; });
-
+                gameData.forEach(item => { 
+                    if(item.recommendation) recCounts[item.recommendation] = (recCounts[item.recommendation] || 0) + 1; 
+                    if(item.sequelInterest) sequelCounts[item.sequelInterest] = (sequelCounts[item.sequelInterest] || 0) + 1;
+                });
                 const avg = reviews.length > 0 ? (score / reviews.length).toFixed(1) : '0.0';
-                const satId = `sat-chart-${index}`, recId = `rec-chart-${index}`;
+                const starEmoji = '⭐';
+
+                const satId = `sat-chart-${index}`, sequelId = `sequel-chart-${index}`, recId = `rec-chart-${index}`;
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td onclick="selectGame('${gameTitle}')">${gameTitle}</td>
                     <td><span class="stat-number">${uniqueGameIds.size}</span></td>
                     <td><span class="stat-number">${gameData.length}</span></td>
                     <td><span class="stat-number">${reviews.length}</span></td>
-                    <td><span class="stat-number" style="color:var(--primary)">${avg}</span></td>
+                    <td><span class="stat-number" style="color:var(--primary)">${starEmoji} ${avg}</span></td>
                     <td><div class="mini-chart-container"><canvas id="${satId}"></canvas></div></td>
+                    <td><div class="mini-chart-container"><canvas id="${sequelId}"></canvas></div></td>
                     <td><div class="mini-chart-container"><canvas id="${recId}"></canvas></div></td>
                 `;
                 tbody.appendChild(row);
-                setTimeout(() => { renderMiniChart(satId, satCounts, 'doughnut'); renderMiniChart(recId, recCounts, 'bar'); }, 100);
+                setTimeout(() => { 
+                    renderMiniChart(satId, satCounts, 'satisfaction'); 
+                    renderMiniChart(sequelId, sequelCounts, 'sequelInterest');
+                    renderMiniChart(recId, recCounts, 'recommendation'); 
+                }, 100);
+            });
+        }
+
+        function renderMiniChart(id, data, key) {
+            const canvas = document.getElementById(id);
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            if (charts[id]) charts[id].destroy();
+            
+            const fixedOrders = {
+                satisfaction: ['🥲 아쉬워요', '🙂 괜찮아요', '🥰 최고에요'],
+                recommendation: ['입문자', '경험자', '고인물'],
+                sequelInterest: ['아니오', '주제 보고', '무조건']
+            };
+
+            const rawCounts = { ...data };
+            const labels = [...fixedOrders[key]];
+            const values = labels.map(targetLabel => {
+                let sum = 0;
+                if (key === 'sequelInterest') {
+                    const mapping = {
+                        '아니오': ['아니오, 이번 경험으로 충분합니다.', '아니오'],
+                        '주제 보고': ['주제나 스토리를 보고 결정할 것 같습니다.', '주제 보고'],
+                        '무조건': ['네! 무조건 플레이하고 싶습니다.', '무조건']
+                    };
+                    (mapping[targetLabel] || []).forEach(t => { sum += rawCounts[t] || 0; delete rawCounts[t]; });
+                } else if (key === 'recommendation') {
+                    const mapping = {
+                        '입문자': ['머더 미스터리가 처음인 \'입문자\'', '미스터리 게임이 처음인 \'입문자\'', '입문자'],
+                        '경험자': ['몇 번 해본 적 있는 \'경험자\'', '경험자'],
+                        '고인물': ['추리에 자신 있는 \'고인물\'', '고인물']
+                    };
+                    (mapping[targetLabel] || []).forEach(t => { sum += rawCounts[t] || 0; delete rawCounts[t]; });
+                } else if (key === 'satisfaction') {
+                    // Satisfaction data is already normalized in renderSummary, so use direct matching
+                    sum = rawCounts[targetLabel] || 0;
+                    delete rawCounts[targetLabel];
+                } else {
+                    const coreTarget = targetLabel.replace(/[🥰🙂😐🥲]/g, '').trim();
+                    Object.keys(rawCounts).forEach(actualLabel => {
+                        const coreActual = actualLabel.replace(/[🥰🙂😐🥲]/g, '').trim();
+                        if (coreActual === coreTarget || actualLabel.includes(coreTarget)) {
+                            sum += rawCounts[actualLabel];
+                            delete rawCounts[actualLabel];
+                        }
+                    });
+                }
+                return sum;
+            });
+
+            const remainingSum = Object.values(rawCounts).reduce((a, b) => a + b, 0);
+            if (remainingSum > 0) { labels.push('기타'); values.push(remainingSum); }
+
+            const maxVal = Math.max(...values);
+            const maxIndex = values.indexOf(maxVal);
+
+            charts[id] = new Chart(ctx, { 
+                data: { labels: labels, datasets: [{ type: 'line', data: values, borderColor: '#1d1d1f', borderWidth: 2, fill: false, tension: 0.4, pointRadius: 0, order: 1 }, { type: 'bar', data: values, backgroundColor: '#e8e8ed', borderRadius: 2, order: 2 }] }, 
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    layout: { padding: { top: 2, bottom: 0, left: 2, right: 2 } }, // 하단 여백 완전히 제거
+                    scales: { 
+                        x: { 
+                            display: true,
+                            grid: { display: false },
+                            border: { display: false },
+                            ticks: {
+                                display: true,
+                                autoSkip: false,
+                                font: { size: 9, weight: '600' },
+                                color: '#1d1d1f',
+                                padding: 0,
+                                maxRotation: 0,
+                                minRotation: 0,
+                                callback: function(val, index) {
+                                    return index === maxIndex ? this.getLabelForValue(val) : '';
+                                }
+                            }
+                        }, 
+                        y: { display: false, beginAtZero: true, grace: '5%' }
+                    }, 
+                    plugins: { 
+                        legend: { display: false }, 
+                        tooltip: { enabled: true },
+                        datalabels: { display: false }
+                    } 
+                } 
             });
         }
 
@@ -607,7 +720,8 @@
                 else if (item.satisfaction.includes('괜찮아요')) score += 3;
                 else if (item.satisfaction.includes('아쉬')) score += 1;
             });
-            document.getElementById('avg-satisfaction').textContent = reviews.length > 0 ? (score / reviews.length).toFixed(1) : '0.0';
+            const avg = reviews.length > 0 ? (score / reviews.length).toFixed(1) : '0.0';
+            document.getElementById('avg-satisfaction').textContent = `⭐ ${avg}`;
             document.getElementById('total-games').textContent = new Set(data.map(item => item.gameId).filter(id => id && id.trim())).size;
         }
 
@@ -701,13 +815,39 @@
                         options: { 
                             responsive: true, maintainAspectRatio: false, layout: { padding: { top: 10, bottom: 10, left: 0, right: 0 } },
                             cutout: isDoughnut ? '80%' : 0, 
-                            plugins: { 
-                                legend: { position: 'bottom', display: isDoughnut, labels: { boxWidth: 8, padding: 20, font: { size: 11, weight: '500' }, usePointStyle: true } },
-                                tooltip: { backgroundColor: 'rgba(0,0,0,0.8)', padding: 12, titleFont: { size: 13 }, bodyFont: { size: 13 }, callbacks: { label: (ctx) => ` ${ctx.label}: ${ctx.raw}명` } }
+                        plugins: { 
+                            legend: { position: 'bottom', display: isDoughnut, labels: { boxWidth: 8, padding: 20, font: { size: 11, weight: '500' }, usePointStyle: true } },
+                            tooltip: { 
+                                backgroundColor: 'rgba(0,0,0,0.8)', 
+                                padding: 12, 
+                                titleFont: { size: 13 }, 
+                                bodyFont: { size: 13 }, 
+                                callbacks: { label: (ctx) => ` ${ctx.label}: ${ctx.raw}명` } 
+                            },
+                            datalabels: { display: false }
+                        }, 
+                        scales: isDoughnut ? {} : { 
+                            y: { 
+                                beginAtZero: true, 
+                                grace: '20%', 
+                                ticks: { 
+                                    display: false, // Hide Y-axis numbers
+                                    stepSize: 1, 
+                                    font: { size: 10 }, 
+                                    color: '#86868b' 
+                                }, 
+                                grid: { color: '#f5f5f7' } 
                             }, 
-                            scales: isDoughnut ? {} : { y: { beginAtZero: true, grace: '20%', ticks: { stepSize: 1, font: { size: 10 }, color: '#86868b' }, grid: { color: '#f5f5f7' } }, x: { ticks: { font: { size: 10 }, color: '#86868b' }, grid: { display: false } } } 
-                        }
-                    });
+                            x: { 
+                                ticks: { 
+                                    font: { size: 10 }, 
+                                    color: '#86868b' 
+                                }, 
+                                grid: { display: false } 
+                            } 
+                        } 
+                    }
+                });
                     // #region agent log
                     fetch('http://127.0.0.1:7243/ingest/cedb580a-3ce2-4a76-aff9-90441ec1495a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hypothesisId:'4',location:'index.html:createChart',message:'Chart created',data:{id,labels,values},timestamp:Date.now()})}).catch(()=>{});
                     // #endregion
@@ -723,53 +863,6 @@
             createChart('inflowChart', 'inflow', true);
             createChart('recommendationChart', 'recommendation');
             createChart('sequelChart', 'sequelInterest');
-        }
-
-        function renderMiniChart(id, data, type) {
-            const canvas = document.getElementById(id);
-            if (!canvas) return;
-            const ctx = canvas.getContext('2d');
-            if (charts[id]) charts[id].destroy();
-            
-            const fixedOrders = {
-                doughnut: ['🥲 아쉬워요', '🙂 괜찮아요', '🥰 최고에요'],
-                bar: ['입문자', '경험자', '고인물']
-            };
-
-            const rawCounts = { ...data };
-            const labels = fixedOrders[type === 'doughnut' ? 'doughnut' : 'bar'];
-            const values = labels.map(targetLabel => {
-                let sum = 0;
-                if (targetLabel === '입문자') {
-                    const targets = ['머더 미스터리가 처음인 \'입문자\'', '미스터리 게임이 처음인 \'입문자\'', '입문자'];
-                    targets.forEach(t => { sum += rawCounts[t] || 0; delete rawCounts[t]; });
-                } else if (targetLabel === '경험자') {
-                    const targets = ['몇 번 해본 적 있는 \'경험자\'', '경험자'];
-                    targets.forEach(t => { sum += rawCounts[t] || 0; delete rawCounts[t]; });
-                } else if (targetLabel === '고인물') {
-                    const targets = ['추리에 자신 있는 \'고인물\'', '고인물'];
-                    targets.forEach(t => { sum += rawCounts[t] || 0; delete rawCounts[t]; });
-                } else {
-                    const coreTarget = targetLabel.replace(/[🥰🙂😐🥲]/g, '').trim();
-                    Object.keys(rawCounts).forEach(actualLabel => {
-                        const coreActual = actualLabel.replace(/[🥰🙂😐🥲]/g, '').trim();
-                        if (coreActual === coreTarget || actualLabel.includes(coreTarget)) {
-                            sum += rawCounts[actualLabel];
-                            delete rawCounts[actualLabel];
-                        }
-                    });
-                }
-                return sum;
-            });
-
-            const remainingSum = Object.values(rawCounts).reduce((a, b) => a + b, 0);
-            if (remainingSum > 0) { labels.push('기타'); values.push(remainingSum); }
-
-            if (type === 'doughnut') {
-                charts[id] = new Chart(ctx, { type: 'doughnut', data: { labels: labels, datasets: [{ data: values, backgroundColor: pointColors, borderWidth: 0 }] }, options: { cutout: '75%', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { enabled: true } } } });
-            } else {
-                charts[id] = new Chart(ctx, { data: { labels: labels, datasets: [{ type: 'line', data: values, borderColor: '#1d1d1f', borderWidth: 1, fill: false, tension: 0.4, pointRadius: 0, order: 1 }, { type: 'bar', data: values, backgroundColor: '#e8e8ed', borderRadius: 2, order: 2 }] }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { display: false }, y: { display: false, beginAtZero: true, grace: '20%' } }, plugins: { legend: { display: false }, tooltip: { enabled: true } } } });
-            }
         }
 
         function renderReviews(data) {
