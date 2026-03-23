@@ -379,9 +379,11 @@
     </main>
 
     <script>
-        const API_URL = 'https://script.google.com/macros/s/AKfycbwyQry92GEJjb2uk4ZCWaeprnVm7Gk5RnJiAd0S8dYhCJsBwxDSjACrCU8yIixmkzm3/exec';
+        const SUPABASE_URL = 'https://tlyioijsopxeegzfjlqe.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_AdEHgXPGJ2gKGVAjb7RYSg_YzUuT6jB';
+        const SB_HEADERS = { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` };
         let rawData = [];
-        let gameSettings = window.GAME_SETTINGS || []; // games.js에서 로드된 데이터 사용
+        let gameSettings = window.GAME_SETTINGS || [];
         let charts = {};
         let selectedGame = 'all';
         
@@ -392,7 +394,12 @@
         Chart.register(ChartDataLabels);
 
         document.addEventListener('DOMContentLoaded', async () => {
-            // loadGameSettings() 제거 - 스크립트 태그로 로드됨
+            // Supabase에서 game_settings 로드
+            try {
+                const gsRes = await fetch(`${SUPABASE_URL}/rest/v1/game_settings?select=*&order=order`, { headers: SB_HEADERS });
+                if (gsRes.ok) gameSettings = await gsRes.json();
+            } catch (e) { console.error('game_settings load error', e); }
+
             const cachedData = localStorage.getItem('review_data_cache');
             if (cachedData) {
                 try {
@@ -442,21 +449,15 @@
             const loadingOverlay = document.getElementById('loading-overlay');
             if (!isBackground) { refreshIcon.classList.add('rotating'); loadingOverlay.style.display = 'flex'; }
             try {
-                // #region agent log
-                fetch('http://127.0.0.1:7243/ingest/cedb580a-3ce2-4a76-aff9-90441ec1495a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hypothesisId:'1',location:'index.html:fetchData',message:'Starting fetch',data:{url:API_URL,isBackground,retryCount},timestamp:Date.now()})}).catch(()=>{});
-                // #endregion
-                const response = await fetch(API_URL);
-                // #region agent log
-                fetch('http://127.0.0.1:7243/ingest/cedb580a-3ce2-4a76-aff9-90441ec1495a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hypothesisId:'1',location:'index.html:fetchData',message:'Response received',data:{status:response.status,ok:response.ok},timestamp:Date.now()})}).catch(()=>{});
-                // #endregion
+                const response = await fetch(
+                    `${SUPABASE_URL}/rest/v1/reviews?select=*&order=sent_time.desc`,
+                    { headers: SB_HEADERS }
+                );
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 const json = await response.json();
-                // #region agent log
-                fetch('http://127.0.0.1:7243/ingest/cedb580a-3ce2-4a76-aff9-90441ec1495a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hypothesisId:'2',location:'index.html:fetchData',message:'JSON parsed',data:{count:json.length,firstItem:json[0]},timestamp:Date.now()})}).catch(()=>{});
-                // #endregion
-                
+
                 if (!Array.isArray(json)) {
                     throw new Error('Fetched data is not an array');
                 }
@@ -468,9 +469,6 @@
                 processData(json);
                 initView();
             } catch (error) {
-                // #region agent log
-                fetch('http://127.0.0.1:7243/ingest/cedb580a-3ce2-4a76-aff9-90441ec1495a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hypothesisId:'1,2,4',location:'index.html:fetchData catch',message:'Fetch/Process failed',data:{error:error.message,stack:error.stack},timestamp:Date.now()})}).catch(()=>{});
-                // #endregion
                 console.error('Fetch error:', error);
                 if (retryCount < 2) {
                     console.log(`Retrying... (${retryCount + 1})`);
@@ -491,20 +489,20 @@
                 fetch('http://127.0.0.1:7243/ingest/cedb580a-3ce2-4a76-aff9-90441ec1495a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hypothesisId:'5',location:'index.html:processData',message:'Starting processData',data:{count:jsonData.length},timestamp:Date.now()})}).catch(()=>{});
                 // #endregion
                 rawData = jsonData.map(item => ({
-                    sentTime: item.sentTime,
-                    gameId: item.GameId || '',
-                    gameTitle: item.CleanGameTitle || (item.GameTitle || '').replace(/\s+\d+$/, '').trim(),
-                    originalTitle: item.OriginalGameTitle || item.GameTitle || '',
-                    nickname: item.Nickname || '익명',
-                    role: item.Role || '',
-                    satisfaction: item['만족도'] || '',
-                    experience: item['플레이 경험'] || '',
-                    inflow: item['유입 경로'] || '',
-                    recommendation: item['추천 대상'] || '',
-                    sequelInterest: item['후속작 관심도'] || '',
-                    endingData: item['Ending Data'] || '',
-                    comment: item['추가 의견'] || '',
-                    dateObj: new Date(item.sentTime)
+                    sentTime: item.sent_time || item.sentTime,
+                    gameId: item.game_id || item.GameId || '',
+                    gameTitle: item.game_title || item.CleanGameTitle || (item.GameTitle || '').replace(/\s+\d+$/, '').trim(),
+                    originalTitle: item.original_game_title || item.OriginalGameTitle || item.GameTitle || '',
+                    nickname: item.nickname || item.Nickname || '익명',
+                    role: item.role || item.Role || '',
+                    satisfaction: item.satisfaction || item['만족도'] || '',
+                    experience: item.play_experience || item['플레이 경험'] || '',
+                    inflow: item.inflow_source || item['유입 경로'] || '',
+                    recommendation: item.recommendation_target || item['추천 대상'] || '',
+                    sequelInterest: item.sequel_interest || item['후속작 관심도'] || '',
+                    endingData: item.ending_data || item['Ending Data'] || '',
+                    comment: item.additional_comment || item['추가 의견'] || '',
+                    dateObj: new Date(item.sent_time || item.sentTime)
                 })).filter(item => item.gameTitle);
                 
                 // 기본 정렬을 날짜순이 아닌 games.json 순서로 변경 (요약 페이지용)

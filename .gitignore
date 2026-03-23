@@ -33,3 +33,9 @@ lerna-debug.log*
 
 # Vercel
 .vercel
+
+# Migration scripts (contains service role key)
+scripts/
+
+# Preview files
+slack-preview.html
